@@ -1,1 +1,10 @@
-{ "name": "abalatam-nuvio", "version": "1.0.0", "private": true, "scripts": { "test": "node test/live.cjs" } }
+{
+  "name": "abalatam-nuvio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/live.cjs"
+  },
+  "description": "Addon y plugin de Nuvio para pel\u00edculas y series en latino."
+}
