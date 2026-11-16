@@ -1,4 +1,9 @@
 {
   "version": 2,
-  "functions": { "api/index.js": { "maxDuration": 60, "includeFiles": "{providers,public,assets}/**" } }
+  "functions": { "api/index.js": { "maxDuration": 60, "includeFiles": "{providers,public,assets}/**" } },
+  "rewrites": [
+    { "source": "/manifest.json", "destination": "/api/index" },
+    { "source": "/catalog/:path*", "destination": "/api/index" },
+    { "source": "/meta/:path*", "destination": "/api/index" }
+  ]
 }
