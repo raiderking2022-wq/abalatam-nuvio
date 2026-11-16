@@ -1,4 +1,4 @@
-/* AbaLatam 1.0.0 - Proveedor nativo para Nuvio (películas y series).
+/* AbaLatam 1.1.0 - Proveedor nativo para Nuvio (películas y series).
  * Sin eval, sin claves incrustadas, sin dependencias de Node.
  * Úsalo solo con contenido que tengas derecho a ver.
  */
@@ -209,17 +209,47 @@ function resolvePaulinito(url, referer) {
       var m = /https?:\/\/[^\s"'<>]+?\.(?:m3u8|mp4)(?:\?[^\s"'<>]*)?/i.exec(html);
       if (m) out.push({ url: m[0], label: 'HD' });
     }
-    return out.map(function (s) {
-      return {
-        name: NAME,
-        title: NAME + ' · Latino · ' + s.label,
-        url: s.url.replace(/&amp;/g, '&'),
-        quality: /1080/.test(s.label) ? '1080p' : /720|HD/i.test(s.label) ? '720p' : 'Auto',
-        // El CDN devuelve 404 si falta el Referer del reproductor.
-        headers: { 'User-Agent': UA, 'Referer': url, 'Origin': 'https://paulinito.com' }
-      };
+    // Cada fuente se convierte en la lista de calidades que realmente ofrece.
+    var headers = { 'User-Agent': UA, 'Referer': url, 'Origin': 'https://paulinito.com' };
+    var list = out.map(function (s) {
+      return masterQualities(s.url, headers, s.label);
     });
+    return Promise.all(list).then(function (groups) { return [].concat.apply([], groups); });
   }).catch(function (e) { log('reproductor: ' + e.message); return []; });
+}
+
+// Lee la lista maestra y crea un enlace por calidad (360p a 1080p).
+function masterQualities(masterUrl, headers, label) {
+  return get(masterUrl, headers.Referer).then(function (text) {
+    var base = masterUrl.replace(/[^/]*$/, '');
+    var entries = [], re = /#EXT-X-STREAM-INF:[^\n]*RESOLUTION=(\d+)x(\d+)[^\n]*\n([^\s]+)/g, m;
+    while ((m = re.exec(text))) {
+      var src = m[3];
+      if (!/^https?:/.test(src)) src = base + src.replace(/^\/+/, '');
+      entries.push({
+        name: NAME,
+        title: NAME + ' · Latino · ' + m[2] + 'p',
+        url: src,
+        quality: m[2] + 'p',
+        headers: headers
+      });
+    }
+    if (!entries.length) {
+      // Lista simple: una sola calidad.
+      var single = /1080/.test(label || '') ? '1080p' : /720|HD/i.test(label || '') ? '720p' : 'Auto';
+      entries.push({
+        name: NAME, title: NAME + ' · Latino · ' + (label || single),
+        url: masterUrl, quality: single, headers: headers
+      });
+    }
+    return entries;
+  }).catch(function (e) {
+    log('lista de calidades: ' + e.message);
+    return [{
+      name: NAME, title: NAME + ' · Latino · ' + (label || 'Auto'),
+      url: masterUrl, quality: /1080/.test(label || '') ? '1080p' : 'Auto', headers: headers
+    }];
+  });
 }
 
 /* ---------- Entrada de Nuvio ---------- */

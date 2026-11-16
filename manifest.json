@@ -1,14 +1,14 @@
 {
   "name": "AbaLatam",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scrapers": [
     {
       "id": "abalatam",
       "name": "AbaLatam",
       "description": "Películas y series en español latino. Búsqueda por título latino y episodios por temporada.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": "AbaLatam",
-      "filename": "providers/abalatam.js?v=1.0.0",
+      "filename": "providers/abalatam.js?v=1.1.0",
       "supportedTypes": ["movie", "tv"],
       "contentLanguage": ["es"],
       "formats": ["m3u8"],
