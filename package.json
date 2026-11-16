@@ -8,6 +8,6 @@
   },
   "description": "Addon y plugin de Nuvio para pel\u00edculas y series en latino.",
   "engines": {
-    "node": "20.x"
+    "node": "26.x"
   }
 }
