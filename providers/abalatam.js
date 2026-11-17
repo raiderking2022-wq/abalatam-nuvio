@@ -270,4 +270,8 @@ function getStreams(tmdbId, mediaType, season, episode) {
   }).catch(function (e) { log('error: ' + e.message); return []; });
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { getStreams: getStreams };
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { getStreams: getStreams };
+  // Uso interno del addon en Vercel; Nuvio solo usa getStreams.
+  module.exports._internal = { playersFromPage: playersFromPage, resolvePaulinito: resolvePaulinito };
+}

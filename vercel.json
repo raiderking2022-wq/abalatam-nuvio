@@ -1,9 +1,13 @@
 {
   "version": 2,
-  "functions": { "api/*.js": { "maxDuration": 60, "includeFiles": "{logo.png,banner.jpg}" } },
+  "functions": { "api/*.js": { "maxDuration": 60, "includeFiles": "{logo.png,banner.jpg,providers/**}" } },
+  "redirects": [
+    { "source": "/", "destination": "/addon/manifest.json", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/addon/:path*", "destination": "/api/nuvio?route=:path*" },
     { "source": "/catalog/:path*", "destination": "/api/index" },
-    { "source": "/meta/:path*", "destination": "/api/index" }
+    { "source": "/meta/:path*", "destination": "/api/index" },
+    { "source": "/stream/:path*", "destination": "/api/index" }
   ]
 }

@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const BASE = 'https://pelis182.net';
 const UA = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36';
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 
 async function fetchText(url) {
   const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'es' }, signal: AbortSignal.timeout(9000) });
@@ -50,22 +50,56 @@ async function catalog(type, search, skip) {
   const html = await fetchText(url);
   return { metas: cards(html).filter(c => c.type === type) };
 }
-async function meta(id) {
+// Funciones del plugin (las mismas que usa Nuvio en el dispositivo).
+const plugin = require('./providers/abalatam.js')._internal;
+
+async function meta(type, id) {
   const slug = id.replace(/^aba:/, '');
   const html = await fetchText(BASE + '/' + slug + '/');
   const og = /<meta property="og:image" content="([^"]+)"/.exec(html);
   const desc = /<meta name="description" content="([^"]*)"/.exec(html);
   const h1 = /<h1 class="watch-title">([^<]+)<\/h1>/.exec(html);
   const year = /"dateCreated":"(\d{4})/.exec(html);
-  const badges = [...html.matchAll(/p182-card__badge">\s*([A-Z]+)/g)].map(m => m[1]);
-  return {
-    meta: {
-      id, type: badges.includes('SERIE') ? 'series' : 'movie',
-      name: h1 ? decode(h1[1]) : slug,
-      poster: og ? og[1] : undefined, background: og ? og[1] : undefined,
-      description: desc ? decode(desc[1]) : undefined,
-      releaseInfo: year ? year[1] : undefined
+  const m = {
+    id, type,
+    name: h1 ? decode(h1[1]) : slug,
+    poster: og ? og[1] : undefined, background: og ? og[1] : undefined,
+    description: desc ? decode(desc[1]) : undefined,
+    releaseInfo: year ? year[1] : undefined
+  };
+  if (type === 'series') {
+    // Episodios a partir de los botones T{temporada}X{episodio} de la página.
+    const seen = new Set(), videos = [];
+    const re = /<button[^>]*data-iframe="[^"]*"[^>]*>\s*T(\d+)\s*X\s*(\d+)\s*<\/button>/gi;
+    let e;
+    while ((e = re.exec(html))) {
+      const vid = id + ':' + (+e[1]) + ':' + (+e[2]);
+      if (seen.has(vid)) continue;
+      seen.add(vid);
+      videos.push({ id: vid, title: 'Episodio ' + (+e[2]), season: +e[1], episode: +e[2], released: new Date(0).toISOString() });
     }
+    videos.sort((a, b) => a.season - b.season || a.episode - b.episode);
+    m.videos = videos;
+  }
+  return { meta: m };
+}
+
+async function streams(type, id) {
+  const parts = id.replace(/^aba:/, '').split(':');
+  const slug = parts[0];
+  const kind = type === 'series' ? 'tv' : 'movie';
+  const season = +parts[1] || 1, episode = +parts[2] || 1;
+  const pageUrl = BASE + '/' + slug + '/';
+  const html = await fetchText(pageUrl);
+  const players = plugin.playersFromPage(html, kind, season, episode);
+  console.log('[addon] stream ' + id + ': ' + players.length + ' reproductores');
+  const lists = await Promise.all(players.map(p => plugin.resolvePaulinito(p, pageUrl)));
+  return {
+    streams: [].concat(...lists).map(s => ({
+      name: s.name, title: s.title, url: s.url,
+      headers: s.headers,
+      behaviorHints: { notWebReady: true, bingeGroup: 'abalatam-' + s.quality, proxyHeaders: { request: s.headers } }
+    }))
   };
 }
 
@@ -81,12 +115,13 @@ async function handler(req, res) {
     if (u.pathname === '/manifest.json') {
       return send(200, {
         id: 'org.abalatam.catalog', version: VERSION, name: 'AbaLatam',
-        description: 'Catálogo de películas y series en español latino. La reproducción la resuelve el plugin AbaLatam.',
+        description: 'Películas y series en español latino: catálogo, episodios y fuentes.',
         logo: origin + '/logo.png', background: origin + '/banner.jpg',
         types: ['movie', 'series'],
         resources: [
           { name: 'catalog', types: ['movie', 'series'] },
-          { name: 'meta', types: ['movie', 'series'], idPrefixes: ['aba:'] }
+          { name: 'meta', types: ['movie', 'series'], idPrefixes: ['aba:'] },
+          { name: 'stream', types: ['movie', 'series'], idPrefixes: ['aba:'] }
         ],
         catalogs: [
           { type: 'movie', id: 'aba-movies', name: 'AbaLatam · Películas', extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }] },
@@ -100,7 +135,12 @@ async function handler(req, res) {
         (m = /^\/catalog\/(movie|series)\/[\w-]+\/search=(.+)\.json$/.exec(u.pathname))) {
       return send(200, await catalog(m[1], m[2] ? decodeURIComponent(m[2]) : null, +u.searchParams.get('skip') || 0));
     }
-    if ((m = /^\/meta\/(movie|series)\/(aba:[\w-]+)\.json$/.exec(u.pathname))) return send(200, await meta(m[2]));
+    if ((m = /^\/meta\/(movie|series)\/([^/]+)\.json$/.exec(u.pathname))) {
+      return send(200, await meta(m[1], decodeURIComponent(m[2])));
+    }
+    if ((m = /^\/stream\/(movie|series)\/([^/]+)\.json$/.exec(u.pathname))) {
+      return send(200, await streams(m[1], decodeURIComponent(m[2])));
+    }
     if (u.pathname === '/logo.png' || u.pathname === '/banner.jpg') {
       const file = path.join(__dirname, u.pathname === '/logo.png' ? 'logo.png' : 'banner.jpg');
       const img = fs.readFileSync(file);
@@ -112,8 +152,9 @@ async function handler(req, res) {
     }
     send(404, { error: 'not_found' });
   } catch (e) {
-    console.log('[addon] ' + (e && e.message));
-    send(200, { metas: [] });
+    console.log('[addon] ' + req.url + ' -> ' + (e && e.message));
+    const p = (req.url || '').split('/')[1];
+    send(200, p === 'stream' ? { streams: [] } : p === 'meta' ? { meta: null } : { metas: [] });
   }
 }
 if (require.main === module) http.createServer(handler).listen(process.env.PORT || 3000);
