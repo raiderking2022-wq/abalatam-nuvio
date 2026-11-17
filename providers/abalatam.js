@@ -1,4 +1,4 @@
-/* AbaLatam 1.1.0 - Proveedor nativo para Nuvio (películas y series).
+/* AbaLatam 1.1.1 - Proveedor nativo para Nuvio (películas y series).
  * Sin eval, sin claves incrustadas, sin dependencias de Node.
  * Úsalo solo con contenido que tengas derecho a ver.
  */
@@ -252,6 +252,12 @@ function masterQualities(masterUrl, headers, label) {
   });
 }
 
+// Ordena de mayor a menor calidad (1080p, 720p, 480p, 360p, Auto).
+function sortByQuality(list) {
+  function h(s) { return parseInt(s.quality, 10) || 0; }
+  return list.slice().sort(function (a, b) { return h(b) - h(a); });
+}
+
 /* ---------- Entrada de Nuvio ---------- */
 function getStreams(tmdbId, mediaType, season, episode) {
   var type = mediaType === 'tv' || mediaType === 'series' ? 'tv' : 'movie';
@@ -265,7 +271,7 @@ function getStreams(tmdbId, mediaType, season, episode) {
     return get(card.url, BASE + '/').then(function (html) {
       var players = playersFromPage(html, type, season, episode);
       return Promise.all(players.map(function (p) { return resolvePaulinito(p, card.url); }))
-        .then(function (lists) { return [].concat.apply([], lists); });
+        .then(function (lists) { return sortByQuality([].concat.apply([], lists)); });
     });
   }).catch(function (e) { log('error: ' + e.message); return []; });
 }
@@ -273,5 +279,5 @@ function getStreams(tmdbId, mediaType, season, episode) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { getStreams: getStreams };
   // Uso interno del addon en Vercel; Nuvio solo usa getStreams.
-  module.exports._internal = { playersFromPage: playersFromPage, resolvePaulinito: resolvePaulinito };
+  module.exports._internal = { playersFromPage: playersFromPage, resolvePaulinito: resolvePaulinito, sortByQuality: sortByQuality };
 }
