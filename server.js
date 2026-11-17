@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const BASE = 'https://pelis182.net';
 const UA = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36';
-const VERSION = '1.3.1';
+const VERSION = '1.3.2';
 
 async function fetchText(url) {
   const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'es' }, signal: AbortSignal.timeout(9000) });
@@ -127,7 +127,7 @@ async function handler(req, res) {
       return send(200, {
         id: 'org.abalatam.catalog', version: VERSION, name: 'AbaLatam',
         description: 'Películas y series en español latino: catálogo, episodios y fuentes.',
-        logo: origin + '/logo.png', background: origin + '/banner.jpg',
+        logo: origin + '/logo.png?v=' + VERSION, background: origin + '/banner.jpg',
         types: ['movie', 'series'],
         resources: [
           { name: 'catalog', types: ['movie', 'series'] },
