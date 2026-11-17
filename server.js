@@ -5,6 +5,7 @@
 'use strict';
 const http = require('node:http');
 const fs = require('node:fs');
+const path = require('node:path');
 const BASE = 'https://pelis182.net';
 const UA = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36';
 const VERSION = '1.1.0';
@@ -68,8 +69,9 @@ async function meta(id) {
   };
 }
 
-const server = http.createServer(async (req, res) => {
+async function handler(req, res) {
   const send = (code, data) => {
+    if (res.headersSent) return res.end();
     res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify(data));
   };
@@ -100,18 +102,19 @@ const server = http.createServer(async (req, res) => {
     }
     if ((m = /^\/meta\/(movie|series)\/(aba:[\w-]+)\.json$/.exec(u.pathname))) return send(200, await meta(m[2]));
     if (u.pathname === '/logo.png' || u.pathname === '/banner.jpg') {
-      const file = u.pathname === '/logo.png' ? 'logo.png' : 'banner.jpg';
+      const file = path.join(__dirname, u.pathname === '/logo.png' ? 'logo.png' : 'banner.jpg');
+      const img = fs.readFileSync(file);
       res.writeHead(200, {
         'Content-Type': u.pathname.endsWith('.png') ? 'image/png' : 'image/jpeg',
         'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=3600'
       });
-      return res.end(fs.readFileSync(file));
+      return res.end(img);
     }
     send(404, { error: 'not_found' });
   } catch (e) {
     console.log('[addon] ' + (e && e.message));
     send(200, { metas: [] });
   }
-});
-if (require.main === module) server.listen(process.env.PORT || 3000);
-module.exports = server;
+}
+if (require.main === module) http.createServer(handler).listen(process.env.PORT || 3000);
+module.exports = handler;
