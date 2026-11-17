@@ -13,7 +13,7 @@
       "contentLanguage": ["es"],
       "formats": ["m3u8"],
       "enabled": true,
-      "logo": "https://raw.githubusercontent.com/raiderking2022-wq/abalatam-nuvio/main/logo.png",
+      "logo": "https://raw.githubusercontent.com/raiderking2022-wq/abalatam-nuvio/main/logo.png?v=1.1.1",
       "supportsExternalPlayer": true
     }
   ]
