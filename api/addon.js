@@ -1,6 +1,6 @@
 'use strict';
-const server = require('../server');
+const handler = require('../server');
 module.exports = (req, res) => {
   req.url = '/manifest.json';
-  server.emit('request', req, res);
+  return handler(req, res);
 };
