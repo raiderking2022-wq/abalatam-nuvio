@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const BASE = 'https://pelis182.net';
 const UA = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36';
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 async function fetchText(url) {
   const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'es' }, signal: AbortSignal.timeout(9000) });
@@ -51,7 +51,7 @@ async function catalog(type, search, skip) {
   return { metas: cards(html).filter(c => c.type === type) };
 }
 // Funciones del plugin (las mismas que usa Nuvio en el dispositivo).
-const plugin = require('./providers/abalatam.js')._internal;
+const { getStreams, _internal: plugin } = require('./providers/abalatam.js');
 
 async function meta(type, id) {
   const slug = id.replace(/^aba:/, '');
@@ -84,7 +84,24 @@ async function meta(type, id) {
   return { meta: m };
 }
 
+function toStream(s) {
+  return {
+    name: s.name, title: s.title, url: s.url,
+    headers: s.headers,
+    behaviorHints: { notWebReady: true, bingeGroup: 'abalatam-' + s.quality, proxyHeaders: { request: s.headers } }
+  };
+}
+
 async function streams(type, id) {
+  if (!id.startsWith('aba:')) {
+    // IDs de IMDb (tt123 / tt123:1:2) o TMDB (tmdb:123 / tmdb:123:1:2): búsqueda del plugin.
+    const p = id.split(':');
+    const base = p[0] === 'tmdb' ? p[1] : p[0];
+    const rest = p[0] === 'tmdb' ? p.slice(2) : p.slice(1);
+    const list = await getStreams(base, type === 'series' ? 'tv' : 'movie', rest[0], rest[1]);
+    console.log('[addon] stream ' + id + ': ' + list.length + ' fuentes');
+    return { streams: list.map(toStream) };
+  }
   const parts = id.replace(/^aba:/, '').split(':');
   const slug = parts[0];
   const kind = type === 'series' ? 'tv' : 'movie';
@@ -94,13 +111,7 @@ async function streams(type, id) {
   const players = plugin.playersFromPage(html, kind, season, episode);
   console.log('[addon] stream ' + id + ': ' + players.length + ' reproductores');
   const lists = await Promise.all(players.map(p => plugin.resolvePaulinito(p, pageUrl)));
-  return {
-    streams: [].concat(...lists).map(s => ({
-      name: s.name, title: s.title, url: s.url,
-      headers: s.headers,
-      behaviorHints: { notWebReady: true, bingeGroup: 'abalatam-' + s.quality, proxyHeaders: { request: s.headers } }
-    }))
-  };
+  return { streams: [].concat(...lists).map(toStream) };
 }
 
 async function handler(req, res) {
@@ -121,7 +132,7 @@ async function handler(req, res) {
         resources: [
           { name: 'catalog', types: ['movie', 'series'] },
           { name: 'meta', types: ['movie', 'series'], idPrefixes: ['aba:'] },
-          { name: 'stream', types: ['movie', 'series'], idPrefixes: ['aba:'] }
+          { name: 'stream', types: ['movie', 'series'], idPrefixes: ['aba:', 'tt', 'tmdb:'] }
         ],
         catalogs: [
           { type: 'movie', id: 'aba-movies', name: 'AbaLatam · Películas', extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }] },
