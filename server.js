@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const BASE = 'https://pelis182.net';
 const UA = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36';
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 
 async function fetchText(url) {
   const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'es' }, signal: AbortSignal.timeout(9000) });
@@ -111,7 +111,7 @@ async function streams(type, id) {
   const players = plugin.playersFromPage(html, kind, season, episode);
   console.log('[addon] stream ' + id + ': ' + players.length + ' reproductores');
   const lists = await Promise.all(players.map(p => plugin.resolvePaulinito(p, pageUrl)));
-  return { streams: [].concat(...lists).map(toStream) };
+  return { streams: plugin.sortByQuality([].concat(...lists)).map(toStream) };
 }
 
 async function handler(req, res) {
